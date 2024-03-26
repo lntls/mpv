@@ -330,7 +330,11 @@ static int mapper_map(struct ra_hwdec_mapper *mapper)
         if (mapper->src->imgfmt != IMGFMT_MEDIACODEC)
             return -1;
         AVMediaCodecBuffer *buffer = (AVMediaCodecBuffer *)mapper->src->planes[3];
-        av_mediacodec_release_buffer(buffer, 1);
+        int release_ret = av_mediacodec_release_buffer(buffer, 1);
+        if (release_ret < 0) {
+            MP_ERR(mapper, "mediacodec_release_buffer failed: %d\n", release_ret);
+            return -1;
+        }
     }
 
     bool image_available = false;
