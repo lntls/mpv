@@ -15,6 +15,10 @@ in the list.
     See ``--ao=help`` for a list of compiled-in audio output drivers sorted by
     autoprobe order.
 
+    Note that the default audio output driver is subject to change, and must
+    not be relied upon. If a certain AO needs to be used, it must be
+    explicitly specified.
+
 Available audio output drivers are:
 
 ``alsa``
@@ -138,10 +142,20 @@ Available audio output drivers are:
         passthrough (even if the device reports it as supported). Use with
         extreme care.
 
-
 ``coreaudio_exclusive`` (macOS only)
     Native macOS audio output driver using direct device access and
     exclusive mode (bypasses the sound server).
+
+``avfoundation`` (macOS only)
+    Native macOS audio output driver using ``AVSampleBufferAudioRenderer``
+    in AVFoundation, which supports `spatial audio
+    <https://support.apple.com/en-us/HT211775>`_.
+
+    .. warning::
+
+        Turning on spatial audio may hang the playback
+        if mpv is not started out of the bundle,
+        though playback with spatial audio off always works.
 
 ``openal``
     OpenAL audio output driver.
@@ -287,3 +301,18 @@ Available audio output drivers are:
 
 ``wasapi``
     Audio output to the Windows Audio Session API.
+
+    The following global options are supported by this audio output:
+
+    ``--wasapi-exclusive-buffer=<default|min|1-2000000>``
+        Set buffer duration in exclusive mode (i.e., with
+        ``--audio-exclusive=yes``). ``default`` and ``min`` use the default and
+        minimum device period reported by WASAPI, respectively. You can also
+        directly specify the buffer duration in microseconds, in which case a
+        duration shorter than the minimum device period will be rounded up to
+        the minimum period.
+
+        The default buffer duration should provide robust playback in most
+        cases, but reportedly on some devices there are glitches following
+        stream resets under the default setting. In such cases, specifying a
+        shorter duration might help.

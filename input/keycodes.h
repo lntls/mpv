@@ -115,6 +115,11 @@
 #define MP_KEY_KPLEFT  (MP_KEY_KEYPAD+19)
 #define MP_KEY_KPDOWN  (MP_KEY_KEYPAD+20)
 #define MP_KEY_KPUP  (MP_KEY_KEYPAD+21)
+#define MP_KEY_KPBEGIN  (MP_KEY_KEYPAD+22)
+#define MP_KEY_KPADD  (MP_KEY_KEYPAD+23)
+#define MP_KEY_KPSUBTRACT  (MP_KEY_KEYPAD+24)
+#define MP_KEY_KPMULTIPLY  (MP_KEY_KEYPAD+25)
+#define MP_KEY_KPDIVIDE  (MP_KEY_KEYPAD+26)
 
 // Mouse events from VOs
 #define MP_MBTN_BASE     ((MP_KEY_BASE+0xA0)|MP_NO_REPEAT_KEY|MP_KEY_EMIT_ON_UP)
@@ -216,6 +221,8 @@
 #define MP_KEY_ANY_UNICODE      (MP_KEY_INTERN+5)
 // For mp_input_put_key(): release all keys that are down.
 #define MP_INPUT_RELEASE_ALL    (MP_KEY_INTERN+6)
+// For mp_input_put_key(): release all touch points.
+#define MP_TOUCH_RELEASE_ALL    (MP_KEY_INTERN+7)
 
 // Emit a command even on key-up (normally key-up is ignored). This means by
 // default they binding will be triggered on key-up instead of key-down.

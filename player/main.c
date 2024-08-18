@@ -36,6 +36,7 @@
 #include "osdep/threads.h"
 #include "osdep/timer.h"
 #include "osdep/main-fn.h"
+#include "osdep/win32/smtc.h"
 
 #include "common/av_log.h"
 #include "common/codecs.h"
@@ -44,6 +45,7 @@
 #include "options/m_option.h"
 #include "options/m_property.h"
 #include "common/common.h"
+#include "common/encode_lavc.h"
 #include "common/msg.h"
 #include "common/msg_control.h"
 #include "common/stats.h"
@@ -79,9 +81,9 @@ static const char def_config[] =
 #endif
 
 enum exit_reason {
-  EXIT_NONE,
-  EXIT_NORMAL,
-  EXIT_ERROR,
+    EXIT_NONE,
+    EXIT_NORMAL,
+    EXIT_ERROR,
 };
 
 const char mp_help_text[] =
@@ -96,8 +98,7 @@ const char mp_help_text[] =
 " --playlist=<file> specify playlist file\n"
 "\n"
 " --list-options    list all mpv options\n"
-" --h=<string>      print options which contain the given string in their name\n"
-"\n";
+" --h=<string>      print options which contain the given string in their name\n";
 
 static mp_static_mutex terminal_owner_lock = MP_STATIC_MUTEX_INITIALIZER;
 static struct MPContext *terminal_owner;
@@ -139,6 +140,9 @@ void mp_update_logging(struct MPContext *mpctx, bool preinit)
 
     if (enabled && !preinit && mpctx->opts->consolecontrols)
         terminal_setup_getch(mpctx->input);
+
+    if (enabled)
+        encoder_update_log(mpctx->global);
 }
 
 void mp_print_version(struct mp_log *log, int always)
@@ -149,11 +153,10 @@ void mp_print_version(struct mp_log *log, int always)
         mp_msg(log, v, " built on %s\n", mpv_builddate);
     mp_msg(log, v, "libplacebo version: %s\n", PL_VERSION);
     check_library_versions(log, v);
-    mp_msg(log, v, "\n");
     // Only in verbose mode.
     if (!always) {
         mp_msg(log, MSGL_V, "Configuration: " CONFIGURATION "\n");
-        mp_msg(log, MSGL_V, "List of enabled features: %s\n", FULLCONFIG);
+        mp_msg(log, MSGL_V, "List of enabled features: " FULLCONFIG "\n");
         #ifdef NDEBUG
             mp_msg(log, MSGL_V, "Built with NDEBUG.\n");
         #endif
@@ -223,6 +226,9 @@ static bool handle_help_options(struct MPContext *mpctx)
 
 static int cfg_include(void *ctx, char *filename, int flags)
 {
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+    return 1;
+#endif
     struct MPContext *mpctx = ctx;
     char *fname = mp_get_user_path(NULL, mpctx->global, filename);
     int r = m_config_parse_config_file(mpctx->mconfig, mpctx->global, fname, NULL, flags);
@@ -392,6 +398,11 @@ int mp_initialize(struct MPContext *mpctx, char **options)
 #if HAVE_COCOA
     mpv_handle *ctx = mp_new_client(mpctx->clients, "mac");
     cocoa_set_mpv_handle(ctx);
+#endif
+
+#if defined(HAVE_WIN32_SMTC) && HAVE_WIN32_SMTC
+    if (opts->media_controls == 2 || (mpctx->is_cli && opts->media_controls == 1))
+        mp_smtc_init(mp_new_client(mpctx->clients, "SystemMediaTransportControls"));
 #endif
 
     if (opts->encode_opts->file && opts->encode_opts->file[0]) {
