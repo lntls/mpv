@@ -1,168 +1,133 @@
-Release 0.38.0
+Release 0.40.0
 ==============
 
-This release requires FFmpeg 4.4 or newer and libplacebo 6.338.2 or newer.
+We are excited to announce the release of mpv 0.40.0.
 
-The new improved renderer (vo_gpu_next) is being worked on and not the default yet.
+Key highlights:
 
+* Console: Enhanced autocompletion and visual styling
+* OSC: New selection menu accessible by right-clicking common buttons
+* HDR is now natively supported when using direct rendering (DRM),
+  as well as dmabuf-wayland on Linux
+* Native clipboard access for scripts via new `clipboard` property
+* New command menu, with common actions easily accessible
+* Enhanced select.lua with new selection options for watch history, editions, DVD/Blu-Ray titles
+* New positioning.lua script script for cursor-centric zooming and drag to pan
+* Better stream support for Blu-ray, DVD and CDDA
+* Track selection improvements and better metadata display
+* Added osd-box / sub-box / box profiles to easily enable box styled OSD/OSC
+* Windows support in umpv helper script
 
-Features
---------
+This release requires FFmpeg 6.1 or newer and libplacebo 6.338.2 or newer.
 
-New
-~~~
+# Features
 
-- scripting: add mp.input()
-- player: add an option to automatically turn on deinterlacing
-- mac: add more Now Playing information and functionality
-- osxbundle: automatically include MoltenVK to enable Vulkan support
-- input.conf: bind Ctrl+WHEEL_UP/DOWN to video-zoom
-- ao_avfoundation: initial support for AVFoundation audio driver (macOS)
-- vo: add context menu support on win32
+## New
 
-
-Changed
-~~~~~~~
-
-- osc: allow disabling special mouse wheel behavior
-- mac: add support for dynamic change of geometry, autofit
-- x11_common: allow DPI scale in unit of 0.5 and prefer the value from Xft.dpi
-- vo_gpu_next: save cache to separate files
-- mac: large amounts of refactoring, internal improvements and cleanups
-- builtin.conf: remove debanding from the high-quality profile
-
-
-Removed
-~~~~~~~
-
-- player: remove legacy, non-standard Raspberry Pi-specific support code
-
-
-Options and Commands
---------------------
-
-Added
-~~~~~
-
-- options: add secondary-sub-delay
-- options: add --osd-bar-border-size
-- filter_sdh: add --sub-filter-sdh-enclosures option
-- options: add --secondary-sub-ass-override
-- audio: add --volume-gain option to control volume in decibels
-- command: export current-gpu-context property
-- sub: add --sub-lavc-o option
-- command: add load-config-file and load-input-conf
-- input: add --input-preprocess-wheel option
-- player: add loadfile/loadlist insert-next commands
-- input: rework window dragging to be command controllable
-- options: add --deinterlace-field-parity option
-- vo: add video-target-params property
-- options: add --input-commands that runs commands at startup
+- vf_d3d11vpp: add NVIDIA RTX Video HDR support
+- context_drm_gl: add support for HDR metadata
+- positioning.lua: add new script for video alignment and zooming
+- umpv: add Windows support
+- command: add clipboard property with native backends for Windows, macOS, and Wayland
+- select.lua: add watch history, edition, DVD/Blu-Ray titles and more selection options
+- input.conf: add cursor-centric zoom and drag-to-pan bindings
+- wayland: add support for wp-color-management-v1 protocol
+- console.lua: add persistent command history
+- stats.lua: add timecode display
+- options: add --playlist-exts and --archive-exts
+- wayland_common: support IME usage via text-input-v3
+- command: add multiple track metadata and properties
+- vo_gpu_next: add chroma location and HDR metadata to shader parameters
+- player/screenshot: support more formats for screenshot-raw command
+- demux_mkv: add `--demuxer-mkv-crop-compat` option
+- misc/language: parse hi/sdh/cc tags from external subtitle tracks
+- wayland: support xdg-activation
+- player: add mpv:// protocol
 
 
-Changed
-~~~~~~~
+## Changed
 
-- player/command: add ability to scale overlay
-- mac: add support for window-id property and --drag-and-drop
-- command: support passing scale to `keypress`
-- mac: add support for --auto-window-resize, --input-cursor-passthrough options
-- win32: add support for --input-cursor-passthrough option
-- x11_common: support --title-bar
-- sub: allow setting special page numbers via --teletext_page
-- player: set --hidpi-window-scale to no by default
-- osd_libass: update the OSD bar's dent and border size
-- player: remove --alpha and rename --background to --background-color
-- options: remove --focus-on-open and add --focus-on
-
-
-Removed
-~~~~~~~
-
-- player: remove --term-remaining-playtime option
+- meson: build libmpv by default
+- command: enhance track and playlist display information
+- input.conf: improve numpad key bindings
+- osc.lua: add custom buttons support and improved mouse bindings
+- console.lua: inherit OSD styles and colors
+- options: default to --prefetch-playlist=yes
+- osc.lua: add slimbottombar and slimtopbar layouts
+- command: improve frame-step to go through multiple frames
+- wayland: use wp-presentation v2 if available
+- various: reorganize options into more logical groups
+- vo_gpu_next: improve target colorspace handling
+- options: disable `--input-ime` by default (enabled on demand)
 
 
-Fixes and Minor Enhancements
-----------------------------
+# Options and Commands
 
-- vaapi: add support for vaapi-win32
-- ao/coreaudio_exclusive: fix segfault when changing formats
-- mac: fix libmpv usage without embedding
-- build: only directly link shaderc and spirv-cross on windows
-- build: enable dvbin by default again
-- playloop: use a 16:9 ratio with --force-window
-- mac: report modifier keys on precise scrolling
-- input: fix double click handling
-- input: add missing forward media key ('GO_FORWARD')
-- sub: don't busy loop if the player is paused for cache
-- playlist: correctly populate playlist-path with the --playlist option
-- win32: opt in to the windows segment heap
-- demux_lavf: remove fix_editlists hack for mp4
-- wayland: fix key modifier handling again
-- win32: re-enable IME
-- wayland_common: guard against negative configure sizes
-- demux_lavf: detect ico as images
-- bash-completion: parse the mpv options lazily
-- f_auto_filters: use bwdif_cuda for deinterlacing with cuda hwdec
-- command: do a normal seek instead of a refresh seek when switching vo
-- ad_spdif: fix DTS 44.1khz passthrough playback
-- vo_dmabuf_wayland: scale smarter in hidpi situations
-- hwdec_drmprime: add P010 and P210 support
-- wayland: look for "default" cursor as well as "left_ptr"
-- wayland_common: properly handle high resolution scrolling
-- vo_vdpau: fix timing for nanoseconds
-- demux_mkv: add tags for A_MPEG/L1 (mp1) audio and FFV1 video
-- osdep: fix infinite loop when cancelling subprocess
-- dec_sub: expand sub packet caching
-- player/sub: avoid wasteful subtitle redraws
-- ao_pipewire: add support for SPDIF formats
-- wayland_common: implement multi-seat support
-- vo: make libmpv last in the auto-probing order for cocoa-cb only
-- player/loadfile: rewrite sub autoselection logic
-- meson: add custom target for macOS App bundling
-- image_writer: cleanup leftover files if image writing fails
-- sub: fix LRC lines with multiple timestamps
-- ao: don't clip floating point formats at non-unity gain
-- wayland: remove old sway/wlroots hack
-- hwdec/dmabuf_interop_gl: migrate to EXT_EGL_image_storage on desktop GL
-- sd_ass: don't wrongly recognize \pos as \p
-- ao_audiotrack: fix missing check for passthrough support
-- wayland_common: log if Drag-and-Drop fails
-- vo_gpu_next: render subtitles at video colorspace
-- swresample: stop using deprecated {in,out}_channel_layout options
-- path: don't load any files if --no-config is passed (incl. cache and state)
-- vo_gpu/vo_gpu_next: fix transparency with GLX
-- wayland_common: require WAYLAND_DISPLAY to be set for initialization
-- vo_drm: add support for BGR formats and YUYV
-- stream: enable caching for sockets, pipes and FIFOs
-- ao_coreaudio: stop audio unit after idle timeout
-- vo_gpu_next: add support for --dither-depth=auto
-- vo_gpu_next: don't render ASS subtitles at HDR colorspace
-- video/image_writer: attach MDVC metadata and CLLI metadata
-- win32: resolve dropped shell links (Windows shortcuts)
-- af_lavcac3enc: fix memory leak on 2ch audio
-- win32: increase hires timer resolution
-- input: raise maximum key down limit to 16
-- input: remove max active section limit
-- video/egl_helpers: fix fallback logic for EGL_KHR_create_context
-- ao_pulse: reenable latency hacks by default
-- hwdec/vulkan: enable the stable AV1 extension
-- af_scaletempo2: fix false reporting of frame availability
-- win32: fix native key repeat support
-- ao_pipewire: fix some buffer size / timing calculations
-- audio: pause handling improvements for pull-based AOs
-- ad_spdif: specify missing media type and sample rate
-- mac/vulkan: add support for frame timing via presentation feedback
-- demux_mkv: corrected direction of ProjectionPoseRoll rotation
-- demux_mkv: add support for BCP 47 language tags
-- player: avoid busy looping during subtitle track switches
+## Added
+
+- sd_ass: introduce sub-ass-prune-delay
+- player: add an optional mute flag when framestepping
+- command: add clipboard/text-primary property
+- command: add current-clipboard-backend property
+- command: add notify-property command
+- options: add --script-opt alias for --script-opts-append
+- options: add --osd-bar-marker-{size,style} options
+- options: add --input-ime for improved text input
+- options: add --video-recenter
+- options: add --clipboard-backends
+- options: add --wayland-internal-vsync
+- options: add --sub-scale-signs
+
+
+## Changed
+
+- options: rename --load-osd-console to --load-console
+- player: improve track selection for multi-component languages
+- options: improve frame-step command to handle multiple frames
+- input.conf: make Alt+BS reset --video-align-{x,y}
+- command: print track metadata when changing track
+- command: print track-list with enhanced metadata
+
+
+## Deprecated
+
+- options: deprecate `--gamma-auto` (use gamma-auto.lua script instead)
+- options: deprecate undocumented --cdda-span-{a,b} options
+
+
+# Fixes and Minor Enhancements
+
+- f_hwtransfer: ensure that we convert to full range rgb with scale_vaapi
+- win32: fix window size restore after maximize state
+- build: fix dynamic generation of mpv.desktop file protocols
+- player/sub: avoid pointlessly redecoding subs
+- x11: remove nvidia blacklist logic from --x11-present=auto
+- osc.lua: seek to the nearest chapter when right clicking the seekbar
+- command: fix keybind command with sequence keys
+- video/out/wayland_common: fix crash with multi-seat drag and drop
+- demux: reclaim demux_packets to reduce memory allocator pressure
+- demux_cue: only accept TRACK with AUDIO type
+- player/loadfile: strip common filename part from external track title
+- build: remove unused dvdread dependency
+- wayland: fix vertical resizing and scaling issues
+- console.lua: improve completion and visual appearance
+- sub/osd: default to a semitransparent black back color
+- player: improve playlist handling with prefetch
+- drm: parse EDID using libdisplay-info (which is now a required dependency)
+- win32: fix window size restore after maximize state
+- hwdec_d3d11va: align image mapper dimensions to a multiple of 2
+- wayland: fix DnD with focus follow mouse
+- player: store external filenames as normalized
+- player: properly handle secondary subtitles on the terminal
+- demux_mkv: add support for chroma location
+- vo_dmabuf_wayland: improve and fix format selection
+- player: fix combination of --loop-playlist + --shuffle + --prefetch-playlist
 
 
 This listing is not complete. Check DOCS/client-api-changes.rst for a history
 of changes to the client API, and DOCS/interface-changes.rst for a history
 of changes to other user-visible interfaces.
 
-A complete changelog can be seen by running `git log v0.37.0..v0.38.0`
-in the git repository or by visiting either
-https://github.com/mpv-player/mpv/compare/v0.37.0...v0.38.0 or
-https://git.srsfckn.biz/mpv/log/?qt=range&q=v0.37.0..v0.38.0
+A complete changelog can be seen by running `git log v0.39.0..v0.40.0`
+in the git repository or by visiting
+<https://github.com/mpv-player/mpv/compare/v0.39.0...v0.40.0>.

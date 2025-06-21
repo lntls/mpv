@@ -134,7 +134,7 @@ const struct m_sub_options vulkan_conf = {
 struct priv {
     struct mpvk_ctx *vk;
     struct vulkan_opts *opts;
-    struct ra_vk_ctx_params params;
+    struct ra_ctx_params params;
     struct ra_tex proxy_tex;
 };
 
@@ -172,13 +172,13 @@ void ra_vk_ctx_uninit(struct ra_ctx *ctx)
 pl_vulkan mppl_create_vulkan(struct vulkan_opts *opts,
                              pl_vk_inst vkinst,
                              pl_log pllog,
-                             VkSurfaceKHR surface)
+                             VkSurfaceKHR surface,
+                             bool allow_software)
 {
     VkPhysicalDeviceFeatures2 features = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
     };
 
-#if HAVE_VULKAN_INTEROP
     /*
      * Request the additional extensions and features required to make full use
      * of the ffmpeg Vulkan hwcontext and video decoding capability.
@@ -186,16 +186,29 @@ pl_vulkan mppl_create_vulkan(struct vulkan_opts *opts,
     const char *opt_extensions[] = {
         VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME,
         VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME,
+#ifdef VK_EXT_SHADER_OBJECT_EXTENSION_NAME
+        VK_EXT_SHADER_OBJECT_EXTENSION_NAME,
+#endif
         VK_KHR_VIDEO_DECODE_QUEUE_EXTENSION_NAME,
         VK_KHR_VIDEO_DECODE_H264_EXTENSION_NAME,
         VK_KHR_VIDEO_DECODE_H265_EXTENSION_NAME,
         VK_KHR_VIDEO_QUEUE_EXTENSION_NAME,
         "VK_KHR_video_decode_av1", /* VK_KHR_VIDEO_DECODE_AV1_EXTENSION_NAME */
+        "VK_KHR_video_maintenance2", /* VK_KHR_VIDEO_MAINTENANCE_2_EXTENSION_NAME */
     };
+
+#ifdef VK_EXT_SHADER_OBJECT_EXTENSION_NAME
+    VkPhysicalDeviceShaderObjectFeaturesEXT shader_object_feature = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_OBJECT_FEATURES_EXT,
+        .shaderObject = true,
+    };
+#endif
 
     VkPhysicalDeviceDescriptorBufferFeaturesEXT descriptor_buffer_feature = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_FEATURES_EXT,
-        .pNext = NULL,
+#ifdef VK_EXT_SHADER_OBJECT_EXTENSION_NAME
+        .pNext = &shader_object_feature,
+#endif
         .descriptorBuffer = true,
         .descriptorBufferPushDescriptors = true,
     };
@@ -208,26 +221,24 @@ pl_vulkan mppl_create_vulkan(struct vulkan_opts *opts,
     };
 
     features.pNext = &atomic_float_feature;
-#endif
 
     AVUUID param_uuid = { 0 };
     bool is_uuid = opts->device &&
                    av_uuid_parse(opts->device, param_uuid) == 0;
 
-    assert(pllog);
-    assert(vkinst);
+    mp_assert(pllog);
+    mp_assert(vkinst);
     struct pl_vulkan_params device_params = {
         .instance = vkinst->instance,
         .get_proc_addr = vkinst->get_proc_addr,
         .surface = surface,
+        .allow_software = allow_software,
         .async_transfer = opts->async_transfer,
         .async_compute = opts->async_compute,
         .queue_count = opts->queue_count,
-#if HAVE_VULKAN_INTEROP
         .extra_queues = VK_QUEUE_VIDEO_DECODE_BIT_KHR,
         .opt_extensions = opt_extensions,
         .num_opt_extensions = MP_ARRAY_SIZE(opt_extensions),
-#endif
         .features = &features,
         .device_name = is_uuid ? NULL : opts->device,
     };
@@ -239,7 +250,7 @@ pl_vulkan mppl_create_vulkan(struct vulkan_opts *opts,
 }
 
 bool ra_vk_ctx_init(struct ra_ctx *ctx, struct mpvk_ctx *vk,
-                    struct ra_vk_ctx_params params,
+                    struct ra_ctx_params params,
                     VkPresentModeKHR preferred_mode)
 {
     struct ra_swapchain *sw = ctx->swapchain = talloc_zero(NULL, struct ra_swapchain);
@@ -251,7 +262,8 @@ bool ra_vk_ctx_init(struct ra_ctx *ctx, struct mpvk_ctx *vk,
     p->params = params;
     p->opts = mp_get_config_group(p, ctx->global, &vulkan_conf);
 
-    vk->vulkan = mppl_create_vulkan(p->opts, vk->vkinst, vk->pllog, vk->surface);
+    vk->vulkan = mppl_create_vulkan(p->opts, vk->vkinst, vk->pllog, vk->surface,
+                                    ctx->opts.allow_sw);
     if (!vk->vulkan)
         goto error;
 
@@ -265,9 +277,6 @@ bool ra_vk_ctx_init(struct ra_ctx *ctx, struct mpvk_ctx *vk,
         .surface = vk->surface,
         .present_mode = preferred_mode,
         .swapchain_depth = ctx->vo->opts->swapchain_depth,
-        // mpv already handles resize events, so gracefully allow suboptimal
-        // swapchains to exist in order to make resizing even smoother
-        .allow_suboptimal = true,
     };
 
     if (p->opts->swap_mode >= 0) // user override
@@ -307,6 +316,15 @@ char *ra_vk_ctx_get_device_name(struct ra_ctx *ctx)
     char *device_name = talloc_strdup(NULL, opts->device);
     talloc_free(opts);
     return device_name;
+}
+
+static int color_depth(struct ra_swapchain *sw)
+{
+    struct priv *p = sw->priv;
+    if (p->params.color_depth)
+        return p->params.color_depth(sw->ctx);
+
+    return -1;
 }
 
 static bool start_frame(struct ra_swapchain *sw, struct ra_fbo *out_fbo)
@@ -358,6 +376,7 @@ static void get_vsync(struct ra_swapchain *sw,
 }
 
 static const struct ra_swapchain_fns vulkan_swapchain = {
+    .color_depth   = color_depth,
     .start_frame   = start_frame,
     .submit_frame  = submit_frame,
     .swap_buffers  = swap_buffers,

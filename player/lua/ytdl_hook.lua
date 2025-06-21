@@ -4,6 +4,7 @@ local options = require 'mp.options'
 
 local o = {
     exclude = "",
+    include = "^%w+%.youtube%.com/|^youtube%.com/|^youtu%.be/|^%w+%.twitch%.tv/|^twitch%.tv/",
     try_ytdl_first = false,
     use_manifests = false,
     all_formats = false,
@@ -26,6 +27,7 @@ end)
 
 local chapter_list = {}
 local playlist_cookies = {}
+local playlist_metadata = {}
 
 local function Set (t)
     local set = {}
@@ -33,20 +35,31 @@ local function Set (t)
     return set
 end
 
--- ?: surrogate (keep in mind that there is no lazy evaluation)
-local function iif(cond, if_true, if_false)
-    if cond then
-        return if_true
-    end
-    return if_false
-end
-
 -- youtube-dl JSON name to mpv tag name
 local tag_list = {
+    ["artist"]          = "artist",
+    ["album"]           = "album",
+    ["album_artist"]    = "album_artist",
+    ["composer"]        = "composer",
+    ["upload_date"]     = "date",
+    ["genre"]           = "genre",
+    ["series"]          = "series",
+    ["track"]           = "title",
+    ["track_number"]    = "track",
     ["uploader"]        = "uploader",
     ["channel_url"]     = "channel_url",
-    -- these titles tend to be a bit too long, so hide them on the terminal
-    -- (default --display-tags does not include this name)
+
+    -- These tags are not displayed by default, but can be shown with
+    -- --display-tags
+    ["playlist"]        = "ytdl_playlist",
+    ["playlist_index"]  = "ytdl_playlist_index",
+    ["playlist_title"]  = "ytdl_playlist_title",
+    ["playlist_id"]     = "ytdl_playlist_id",
+    ["chapter"]         = "ytdl_chapter",
+    ["season"]          = "ytdl_season",
+    ["episode"]         = "ytdl_episode",
+    ["is_live"]         = "ytdl_is_live",
+    ["release_year"]    = "ytdl_release_year",
     ["description"]     = "ytdl_description",
     -- "title" is handled by force-media-title
     -- tags don't work with all_formats=yes
@@ -72,6 +85,7 @@ local codec_map = {
     ["avc1%..*"]    = "h264",
     ["av01%..*"]    = "av1",
     ["mp4a%..*"]    = "aac",
+    ["hev1%..*"]    = "hevc",
 }
 
 -- Codec name as reported by youtube-dl mapped to mpv internal codec names.
@@ -264,6 +278,26 @@ local function extract_chapters(data, video_length)
     return ret
 end
 
+local function is_whitelisted(url)
+    url = url:match("https?://(.+)")
+
+    if url == nil then
+        return false
+    end
+
+    url = url:lower()
+
+    for match in o.include:gmatch('%|?([^|]+)') do
+        if url:find(match) then
+            msg.verbose("URL matches included substring " .. match ..
+                        ". Trying ytdl first.")
+            return true
+        end
+    end
+
+    return false
+end
+
 local function is_blacklisted(url)
     if o.exclude == "" then return false end
     if #ytdl.blacklisted == 0 then
@@ -272,7 +306,7 @@ local function is_blacklisted(url)
         end
     end
     if #ytdl.blacklisted > 0 then
-        url = url:match('https?://(.+)')
+        url = url:match('https?://(.+)'):lower()
         for _, exclude in ipairs(ytdl.blacklisted) do
             if url:match(exclude) then
                 msg.verbose('URL matches excluded substring. Skipping.')
@@ -570,7 +604,7 @@ local function formats_to_edl(json, formats, use_all_formats)
                 end
                 hdr[#hdr + 1] = "!track_meta,title=" ..
                     edl_escape(title) .. ",byterate=" .. byterate ..
-                    iif(#flags > 0, ",flags=" .. table.concat(flags, "+"), "")
+                    (#flags > 0 and ",flags=" .. table.concat(flags, "+") or "")
             end
 
             if duration > 0 then
@@ -785,6 +819,7 @@ local function add_single_video(json)
     -- add chapters
     if json.chapters then
         msg.debug("Adding pre-parsed chapters")
+        chapter_list = {}
         for i = 1, #json.chapters do
             local chapter = json.chapters[i]
             local title = chapter.title or ""
@@ -793,12 +828,13 @@ local function add_single_video(json)
             end
             table.insert(chapter_list, {time=chapter.start_time, title=title})
         end
-    elseif json.description ~= nil and json.duration ~= nil then
+    elseif json.description ~= nil and json.duration ~= nil and
+        mp.get_property_bool("ytdl-extract-chapters") then
         chapter_list = extract_chapters(json.description, json.duration)
     end
 
     -- set start time
-    if json.start_time or json.section_start and
+    if (json.start_time or json.section_start) and
         not option_was_set("start") and
         not option_was_set_locally("start") then
         local start_time = json.start_time or json.section_start
@@ -807,7 +843,7 @@ local function add_single_video(json)
     end
 
     -- set end time
-    if json.end_time or json.section_end and
+    if (json.end_time or json.section_end) and
         not option_was_set("end") and
         not option_was_set_locally("end") then
         local end_time = json.end_time or json.section_end
@@ -913,7 +949,7 @@ local function run_ytdl_hook(url)
 
     for param, arg in pairs(raw_options) do
         table.insert(command, "--" .. param)
-        if arg ~= "" then
+        if arg ~= "" or param == "proxy" then
             table.insert(command, arg)
         end
         if (param == "sub-lang" or param == "sub-langs" or param == "srt-lang") and (arg ~= "") then
@@ -926,8 +962,11 @@ local function run_ytdl_hook(url)
     end
 
     if allsubs == true then
-        table.insert(command, "--all-subs")
+        table.insert(command, "--sub-langs")
+        table.insert(command, "all")
     end
+    table.insert(command, "--write-srt")
+
     if not use_playlist then
         table.insert(command, "--no-playlist")
     end
@@ -974,11 +1013,15 @@ local function run_ytdl_hook(url)
         end
 
         ytdl.searched = true
+
+        mp.set_property("user-data/mpv/ytdl/path", ytdl.path or "")
     end
 
     if result.killed_by_us then
         return
     end
+
+    mp.set_property_native("user-data/mpv/ytdl/json-subprocess-result", result)
 
     local json = result.stdout
     local parse_err = nil
@@ -1031,6 +1074,11 @@ local function run_ytdl_hook(url)
             msg.warn("Got empty playlist, nothing to play.")
             return
         end
+
+        playlist_metadata[url] = {
+            playlist_title = json["title"],
+            playlist_id = json["id"]
+        }
 
         local self_redirecting_url =
             json.entries[1]["_type"] ~= "url_transparent" and
@@ -1146,6 +1194,12 @@ local function run_ytdl_hook(url)
         end
 
     else -- probably a video
+        -- add playlist metadata if any belongs to the current video
+        local metadata = playlist_metadata[mp.get_property("playlist-path")] or {}
+        for key, value in pairs(metadata) do
+            json[key] = value
+        end
+
         add_single_video(json)
     end
     msg.debug('script running time: '..os.clock()-start_time..' seconds')
@@ -1153,8 +1207,8 @@ end
 
 local function on_load_hook(load_fail)
     local url = mp.get_property("stream-open-filename", "")
-    local force = url:find("^ytdl://")
-    local early = force or o.try_ytdl_first
+    local force = url:find("^ytdl://") ~= nil
+    local early = force or o.try_ytdl_first or is_whitelisted(url)
     if early == load_fail then
         return
     end
@@ -1182,4 +1236,8 @@ mp.add_hook("on_preloaded", 10, function ()
         mp.set_property_native("chapter-list", chapter_list)
         chapter_list = {}
     end
+end)
+
+mp.add_hook("on_after_end_file", 50, function ()
+    mp.del_property("user-data/mpv/ytdl/json-subprocess-result")
 end)
